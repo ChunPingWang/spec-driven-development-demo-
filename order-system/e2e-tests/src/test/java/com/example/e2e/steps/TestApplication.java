@@ -1,4 +1,4 @@
-package com.example.e2e.config;
+package com.example.e2e.steps;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 

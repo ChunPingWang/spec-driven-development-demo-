@@ -1,6 +1,9 @@
 package com.example.e2e.steps;
 
-import io.cucumber.java.zh_tw.*;
+import io.cucumber.java.zh_tw.假設;
+import io.cucumber.java.zh_tw.當;
+import io.cucumber.java.zh_tw.那麼;
+import io.cucumber.java.zh_tw.並且;
 import io.cucumber.java.Before;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
