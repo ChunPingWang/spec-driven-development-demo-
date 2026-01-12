@@ -1,50 +1,172 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+  SYNC IMPACT REPORT
+  ====================
+  Version change: 0.0.0 → 1.0.0 (Initial constitution adoption)
+
+  Modified principles: N/A (Initial version)
+
+  Added sections:
+  - Core Principles (6 principles)
+  - Architecture Constraints
+  - Development Workflow
+  - Governance
+
+  Removed sections: N/A (Initial version)
+
+  Templates requiring updates:
+  - .specify/templates/plan-template.md: ✅ Compatible (Constitution Check section exists)
+  - .specify/templates/spec-template.md: ✅ Compatible (BDD scenarios supported)
+  - .specify/templates/tasks-template.md: ✅ Compatible (TDD workflow supported)
+
+  Follow-up TODOs: None
+-->
+
+# SDD Demo Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Code Quality First
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+All code MUST meet high quality standards. This includes:
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+- Clean, readable, and maintainable code
+- Consistent coding style and conventions
+- Meaningful naming for variables, functions, and classes
+- Small, focused functions with single responsibilities
+- Comprehensive documentation where behavior is not self-evident
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Rationale**: Quality code reduces technical debt, eases maintenance, and enables sustainable development velocity.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Test-Driven Development (TDD)
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Development MUST follow the Red-Green-Refactor cycle:
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+1. **Red**: Write a failing test that defines expected behavior
+2. **Green**: Write minimal code to make the test pass
+3. **Refactor**: Improve code structure while keeping tests green
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Tests MUST be written before implementation. No production code is written without a failing test first.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+**Rationale**: TDD ensures testable design, reduces defects, and provides living documentation of system behavior.
+
+### III. Behavior-Driven Development (BDD)
+
+User-facing features MUST be specified using BDD scenarios:
+
+- **Given** [initial context/state]
+- **When** [action/event occurs]
+- **Then** [expected outcome]
+
+Acceptance criteria MUST be expressed in this format to ensure clear, testable requirements.
+
+**Rationale**: BDD bridges communication between technical and non-technical stakeholders, ensuring features meet actual user needs.
+
+### IV. Domain-Driven Design (DDD)
+
+The codebase MUST reflect the business domain through:
+
+- Ubiquitous language shared between developers and domain experts
+- Bounded contexts with clear boundaries
+- Domain models that encapsulate business logic
+- Entities, value objects, and aggregates as core building blocks
+- Domain events for cross-context communication
+
+**Rationale**: DDD ensures the software model aligns with business reality, reducing translation errors and improving maintainability.
+
+### V. SOLID Principles
+
+All object-oriented code MUST adhere to SOLID principles:
+
+- **S**ingle Responsibility: Each class has one reason to change
+- **O**pen/Closed: Open for extension, closed for modification
+- **L**iskov Substitution: Subtypes MUST be substitutable for base types
+- **I**nterface Segregation: Prefer specific interfaces over general ones
+- **D**ependency Inversion: Depend on abstractions, not concretions
+
+**Rationale**: SOLID principles produce flexible, maintainable, and testable code architectures.
+
+### VI. Hexagonal Architecture
+
+The system MUST follow hexagonal (ports and adapters) architecture:
+
+- **Domain Layer** (innermost): Business logic and domain models
+- **Application Layer**: Use cases and application services
+- **Infrastructure Layer** (outermost): Frameworks, databases, external services
+
+Layer access rules:
+- Infrastructure MAY directly use Application and Domain layers
+- Application and Domain layers MUST access Infrastructure only through interfaces (ports)
+- Data transfer between layers MUST use mappers for transformation
+- No framework dependencies in Domain or Application layers
+
+**Rationale**: Hexagonal architecture isolates business logic from technical concerns, enabling technology changes without domain impact.
+
+## Architecture Constraints
+
+### Dependency Flow
+
+Dependencies MUST flow inward only:
+
+```
+Infrastructure → Application → Domain
+     ↓               ↓           ↓
+   (outer)       (middle)     (inner)
+```
+
+### Interface Requirements
+
+- All external dependencies MUST be abstracted behind interfaces
+- Interfaces MUST be defined in the layer that uses them (Application or Domain)
+- Implementations MUST reside in Infrastructure layer
+
+### Mapper Requirements
+
+Data crossing layer boundaries MUST be transformed via mappers:
+
+- DTOs for API/external communication
+- Domain models for business logic
+- Persistence models for database operations
+
+No direct entity exposure to external layers.
+
+## Development Workflow
+
+### Test Standards
+
+- Unit tests for domain and application logic (isolated, fast)
+- Integration tests for infrastructure adapters
+- Contract tests for external API boundaries
+- All tests MUST be deterministic and repeatable
+
+### Code Review Gates
+
+All changes MUST pass:
+
+1. All tests green
+2. No SOLID violations
+3. Layer boundaries respected
+4. Mappers used for cross-layer data transfer
+5. Domain logic free of infrastructure dependencies
+
+### Definition of Done
+
+A feature is complete when:
+
+- All acceptance scenarios (BDD) pass
+- Unit test coverage for new domain/application code
+- Integration tests for new infrastructure code
+- Code review approved
+- Documentation updated (if behavior changed)
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices. Amendments require:
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+1. Written proposal with rationale
+2. Impact assessment on existing code
+3. Migration plan if breaking changes
+4. Version update following semantic versioning
+
+All pull requests and code reviews MUST verify compliance with these principles. Complexity beyond what is specified here MUST be explicitly justified and documented.
+
+**Version**: 1.0.0 | **Ratified**: 2026-01-12 | **Last Amended**: 2026-01-12

@@ -1,0 +1,306 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  description: |
+    Payment microservice API for two-phase payment processing.
+    Supports authorize, capture, and void operations.
+  version: 1.0.0
+  contact:
+    name: Order System Team
+
+servers:
+  - url: http://localhost:8082
+    description: Local development server
+
+tags:
+  - name: Payment Commands
+    description: Payment write operations
+  - name: Payment Queries
+    description: Payment read operations
+
+paths:
+  /api/v1/payments/authorize:
+    post:
+      tags:
+        - Payment Commands
+      summary: Authorize a payment
+      description: |
+        Pre-authorizes payment without capturing funds.
+        Creates a hold on the customer's card for the specified amount.
+      operationId: authorizePayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizePaymentRequest'
+            example:
+              orderId: "ORD-A1B2C3D4"
+              amount: 35000
+              currency: "TWD"
+              cardNumber: "4111111111111111"
+              expiryDate: "12/28"
+              cvv: "123"
+      responses:
+        '200':
+          description: Authorization result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                success:
+                  summary: Authorization successful
+                  value:
+                    paymentId: "PAY-X1Y2Z3"
+                    orderId: "ORD-A1B2C3D4"
+                    status: "AUTHORIZED"
+                    success: true
+                    authorizationCode: "AUTH-123456"
+                    message: "Payment authorized"
+                failure:
+                  summary: Authorization failed
+                  value:
+                    paymentId: null
+                    orderId: "ORD-A1B2C3D4"
+                    status: "FAILED"
+                    success: false
+                    authorizationCode: null
+                    message: "Card declined"
+
+  /api/v1/payments/{paymentId}/capture:
+    post:
+      tags:
+        - Payment Commands
+      summary: Capture an authorized payment
+      description: |
+        Confirms the charge for a previously authorized payment.
+        Funds are transferred from the customer's account.
+      operationId: capturePayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: Payment ID from authorization
+          schema:
+            type: string
+            example: "PAY-X1Y2Z3"
+      responses:
+        '200':
+          description: Capture result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              examples:
+                success:
+                  summary: Capture successful
+                  value:
+                    paymentId: "PAY-X1Y2Z3"
+                    orderId: "ORD-A1B2C3D4"
+                    status: "CAPTURED"
+                    success: true
+                    authorizationCode: "AUTH-123456"
+                    message: "Payment captured"
+                failure:
+                  summary: Capture failed
+                  value:
+                    paymentId: "PAY-X1Y2Z3"
+                    orderId: "ORD-A1B2C3D4"
+                    status: "AUTHORIZED"
+                    success: false
+                    authorizationCode: "AUTH-123456"
+                    message: "Capture failed"
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/payments/{paymentId}/void:
+    post:
+      tags:
+        - Payment Commands
+      summary: Void an authorized payment
+      description: |
+        Cancels a previously authorized payment.
+        Releases the hold on the customer's card.
+      operationId: voidPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: Payment ID to void
+          schema:
+            type: string
+            example: "PAY-X1Y2Z3"
+      responses:
+        '200':
+          description: Void result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+              example:
+                paymentId: "PAY-X1Y2Z3"
+                orderId: "ORD-A1B2C3D4"
+                status: "VOIDED"
+                success: true
+                authorizationCode: null
+                message: "Payment voided"
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/payments/{paymentId}:
+    get:
+      tags:
+        - Payment Queries
+      summary: Get payment details
+      description: Retrieves payment status and details
+      operationId: getPayment
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: Payment ID
+          schema:
+            type: string
+            example: "PAY-X1Y2Z3"
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentDetailResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    AuthorizePaymentRequest:
+      type: object
+      required:
+        - orderId
+        - amount
+        - currency
+        - cardNumber
+        - expiryDate
+        - cvv
+      properties:
+        orderId:
+          type: string
+          description: Associated order ID (idempotency key)
+          example: "ORD-A1B2C3D4"
+        amount:
+          type: number
+          minimum: 0
+          description: Amount to authorize
+          example: 35000
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: ISO 4217 currency code
+          example: "TWD"
+        cardNumber:
+          type: string
+          description: Credit card number
+          example: "4111111111111111"
+        expiryDate:
+          type: string
+          pattern: "^(0[1-9]|1[0-2])/[0-9]{2}$"
+          description: Card expiry date (MM/YY)
+          example: "12/28"
+        cvv:
+          type: string
+          pattern: "^[0-9]{3,4}$"
+          description: Card security code
+          example: "123"
+
+    PaymentResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          nullable: true
+          description: Generated payment ID
+          example: "PAY-X1Y2Z3"
+        orderId:
+          type: string
+          description: Associated order ID
+          example: "ORD-A1B2C3D4"
+        status:
+          type: string
+          enum: [PENDING, AUTHORIZED, CAPTURED, FAILED, VOIDED]
+          description: Current payment status
+          example: "AUTHORIZED"
+        success:
+          type: boolean
+          description: Whether the operation succeeded
+          example: true
+        authorizationCode:
+          type: string
+          nullable: true
+          description: Authorization code from acquirer
+          example: "AUTH-123456"
+        message:
+          type: string
+          description: Operation result message
+          example: "Payment authorized"
+
+    PaymentDetailResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          example: "PAY-X1Y2Z3"
+        orderId:
+          type: string
+          example: "ORD-A1B2C3D4"
+        amount:
+          type: number
+          example: 35000
+        currency:
+          type: string
+          example: "TWD"
+        cardLastFour:
+          type: string
+          example: "1111"
+        status:
+          type: string
+          enum: [PENDING, AUTHORIZED, CAPTURED, FAILED, VOIDED]
+          example: "CAPTURED"
+        authorizationCode:
+          type: string
+          example: "AUTH-123456"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:05Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "PAYMENT_NOT_FOUND"
+        message:
+          type: string
+          example: "Payment not found"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:00Z"

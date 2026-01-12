@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Order Service API
+  description: |
+    Order microservice API for creating and querying orders.
+    Implements CQRS pattern with separate command and query endpoints.
+  version: 1.0.0
+  contact:
+    name: Order System Team
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+
+tags:
+  - name: Order Commands
+    description: Order write operations (CQRS Command side)
+  - name: Order Queries
+    description: Order read operations (CQRS Query side)
+
+paths:
+  /api/v1/orders:
+    post:
+      tags:
+        - Order Commands
+      summary: Create a new order
+      description: |
+        Creates a new order and executes the SAGA orchestration:
+        1. Save order (CREATED)
+        2. Authorize payment
+        3. Deduct inventory
+        4. Capture payment
+        5. Complete order
+
+        On failure, compensation is automatically executed.
+      operationId: createOrder
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          description: Client-provided unique key for idempotent order creation
+          schema:
+            type: string
+            example: "order-2026-001-abc123"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            example:
+              buyer:
+                name: "Rex Wang"
+                email: "rex.wang@example.com"
+              orderItem:
+                productId: "IPHONE-17-PRO-MAX"
+                productName: "iPhone 17 Pro Max"
+                quantity: 1
+              payment:
+                method: "CREDIT_CARD"
+                amount: 35000
+                currency: "TWD"
+                cardNumber: "4111111111111111"
+                expiryDate: "12/28"
+                cvv: "123"
+      responses:
+        '201':
+          description: Order created successfully (COMPLETED status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+              example:
+                orderId: "ORD-A1B2C3D4"
+                status: "COMPLETED"
+                message: "訂購成功"
+                createdAt: "2026-01-12T10:30:00Z"
+        '200':
+          description: Order processed but failed or duplicate request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+              examples:
+                paymentFailed:
+                  summary: Payment authorization failed
+                  value:
+                    orderId: "ORD-A1B2C3D4"
+                    status: "FAILED"
+                    message: "支付失敗"
+                    createdAt: "2026-01-12T10:30:00Z"
+                inventoryFailed:
+                  summary: Inventory deduction failed
+                  value:
+                    orderId: "ORD-A1B2C3D4"
+                    status: "ROLLBACK_COMPLETED"
+                    message: "庫存扣減失敗"
+                    createdAt: "2026-01-12T10:30:00Z"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/orders/{orderId}:
+    get:
+      tags:
+        - Order Queries
+      summary: Get order details
+      description: Retrieves full order details including current status
+      operationId: getOrder
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          description: Order ID
+          schema:
+            type: string
+            example: "ORD-A1B2C3D4"
+      responses:
+        '200':
+          description: Order details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailResponse'
+              example:
+                orderId: "ORD-A1B2C3D4"
+                buyerName: "Rex Wang"
+                buyerEmail: "rex.wang@example.com"
+                productId: "IPHONE-17-PRO-MAX"
+                productName: "iPhone 17 Pro Max"
+                quantity: 1
+                amount: 35000
+                currency: "TWD"
+                status: "COMPLETED"
+                createdAt: "2026-01-12T10:30:00Z"
+                updatedAt: "2026-01-12T10:30:05Z"
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - buyer
+        - orderItem
+        - payment
+      properties:
+        buyer:
+          $ref: '#/components/schemas/BuyerInfo'
+        orderItem:
+          $ref: '#/components/schemas/OrderItemInfo'
+        payment:
+          $ref: '#/components/schemas/PaymentInfo'
+
+    BuyerInfo:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          description: Buyer's full name
+          example: "Rex Wang"
+        email:
+          type: string
+          format: email
+          description: Buyer's email address
+          example: "rex.wang@example.com"
+
+    OrderItemInfo:
+      type: object
+      required:
+        - productId
+        - productName
+        - quantity
+      properties:
+        productId:
+          type: string
+          description: Product identifier
+          example: "IPHONE-17-PRO-MAX"
+        productName:
+          type: string
+          description: Product display name
+          example: "iPhone 17 Pro Max"
+        quantity:
+          type: integer
+          minimum: 1
+          description: Quantity to order
+          example: 1
+
+    PaymentInfo:
+      type: object
+      required:
+        - method
+        - amount
+        - currency
+        - cardNumber
+        - expiryDate
+        - cvv
+      properties:
+        method:
+          type: string
+          enum: [CREDIT_CARD]
+          description: Payment method
+          example: "CREDIT_CARD"
+        amount:
+          type: number
+          minimum: 0
+          description: Payment amount
+          example: 35000
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: ISO 4217 currency code
+          example: "TWD"
+        cardNumber:
+          type: string
+          description: Credit card number
+          example: "4111111111111111"
+        expiryDate:
+          type: string
+          pattern: "^(0[1-9]|1[0-2])/[0-9]{2}$"
+          description: Card expiry date (MM/YY)
+          example: "12/28"
+        cvv:
+          type: string
+          pattern: "^[0-9]{3,4}$"
+          description: Card security code
+          example: "123"
+
+    CreateOrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          description: Generated order ID
+          example: "ORD-A1B2C3D4"
+        status:
+          type: string
+          enum: [CREATED, PAYMENT_AUTHORIZED, INVENTORY_DEDUCTED, COMPLETED, FAILED, ROLLBACK_COMPLETED]
+          description: Final order status
+          example: "COMPLETED"
+        message:
+          type: string
+          description: Localized status message
+          example: "訂購成功"
+        createdAt:
+          type: string
+          format: date-time
+          description: Order creation timestamp
+          example: "2026-01-12T10:30:00Z"
+
+    OrderDetailResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "ORD-A1B2C3D4"
+        buyerName:
+          type: string
+          example: "Rex Wang"
+        buyerEmail:
+          type: string
+          example: "rex.wang@example.com"
+        productId:
+          type: string
+          example: "IPHONE-17-PRO-MAX"
+        productName:
+          type: string
+          example: "iPhone 17 Pro Max"
+        quantity:
+          type: integer
+          example: 1
+        amount:
+          type: number
+          example: 35000
+        currency:
+          type: string
+          example: "TWD"
+        status:
+          type: string
+          enum: [CREATED, PAYMENT_AUTHORIZED, INVENTORY_DEDUCTED, COMPLETED, FAILED, ROLLBACK_COMPLETED]
+          example: "COMPLETED"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:05Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Error message
+          example: "Invalid request parameters"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:00Z"

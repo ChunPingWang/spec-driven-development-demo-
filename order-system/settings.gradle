@@ -1,0 +1,6 @@
+rootProject.name = 'order-system'
+
+include 'order-service'
+include 'payment-service'
+include 'inventory-service'
+include 'e2e-tests'

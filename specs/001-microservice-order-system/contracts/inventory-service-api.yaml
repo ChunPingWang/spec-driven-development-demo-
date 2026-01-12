@@ -1,0 +1,229 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service API
+  description: |
+    Inventory microservice API for stock management.
+    Supports stock deduction, rollback, and queries.
+  version: 1.0.0
+  contact:
+    name: Order System Team
+
+servers:
+  - url: http://localhost:8083
+    description: Local development server
+
+tags:
+  - name: Inventory Commands
+    description: Inventory write operations
+  - name: Inventory Queries
+    description: Inventory read operations
+
+paths:
+  /api/v1/inventory/deduct:
+    post:
+      tags:
+        - Inventory Commands
+      summary: Deduct stock for an order
+      description: |
+        Atomically deducts stock for the specified product.
+        Uses orderId as idempotency key - duplicate requests return same result.
+      operationId: deductStock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryRequest'
+            example:
+              orderId: "ORD-A1B2C3D4"
+              productId: "IPHONE-17-PRO-MAX"
+              quantity: 1
+      responses:
+        '200':
+          description: Deduction result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryResponse'
+              examples:
+                success:
+                  summary: Deduction successful
+                  value:
+                    orderId: "ORD-A1B2C3D4"
+                    productId: "IPHONE-17-PRO-MAX"
+                    quantity: 1
+                    success: true
+                    remainingStock: 9
+                    message: "Stock deducted"
+                failure:
+                  summary: Insufficient stock
+                  value:
+                    orderId: "ORD-A1B2C3D4"
+                    productId: "IPHONE-17-PRO-MAX"
+                    quantity: 1
+                    success: false
+                    remainingStock: 0
+                    message: "Insufficient stock"
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/inventory/rollback:
+    post:
+      tags:
+        - Inventory Commands
+      summary: Rollback stock deduction
+      description: |
+        Restores previously deducted stock for an order.
+        Used for compensation when order fails after inventory deduction.
+        Idempotent - safe to retry.
+      operationId: rollbackStock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryRequest'
+            example:
+              orderId: "ORD-A1B2C3D4"
+              productId: "IPHONE-17-PRO-MAX"
+              quantity: 1
+      responses:
+        '200':
+          description: Rollback result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryResponse'
+              example:
+                orderId: "ORD-A1B2C3D4"
+                productId: "IPHONE-17-PRO-MAX"
+                quantity: 1
+                success: true
+                remainingStock: 10
+                message: "Stock rolled back"
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/inventory/{productId}:
+    get:
+      tags:
+        - Inventory Queries
+      summary: Get product stock
+      description: Retrieves current stock level for a product
+      operationId: getStock
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          description: Product ID
+          schema:
+            type: string
+            example: "IPHONE-17-PRO-MAX"
+      responses:
+        '200':
+          description: Stock information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockResponse'
+              example:
+                productId: "IPHONE-17-PRO-MAX"
+                productName: "iPhone 17 Pro Max"
+                stockQuantity: 10
+                updatedAt: "2026-01-12T10:30:00Z"
+        '404':
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    InventoryRequest:
+      type: object
+      required:
+        - orderId
+        - productId
+        - quantity
+      properties:
+        orderId:
+          type: string
+          description: Associated order ID (idempotency key)
+          example: "ORD-A1B2C3D4"
+        productId:
+          type: string
+          description: Product to deduct/rollback
+          example: "IPHONE-17-PRO-MAX"
+        quantity:
+          type: integer
+          minimum: 1
+          description: Quantity to deduct/rollback
+          example: 1
+
+    InventoryResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          description: Associated order ID
+          example: "ORD-A1B2C3D4"
+        productId:
+          type: string
+          description: Product ID
+          example: "IPHONE-17-PRO-MAX"
+        quantity:
+          type: integer
+          description: Quantity processed
+          example: 1
+        success:
+          type: boolean
+          description: Whether the operation succeeded
+          example: true
+        remainingStock:
+          type: integer
+          description: Stock level after operation
+          example: 9
+        message:
+          type: string
+          description: Operation result message
+          example: "Stock deducted"
+
+    StockResponse:
+      type: object
+      properties:
+        productId:
+          type: string
+          example: "IPHONE-17-PRO-MAX"
+        productName:
+          type: string
+          example: "iPhone 17 Pro Max"
+        stockQuantity:
+          type: integer
+          example: 10
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:00Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "PRODUCT_NOT_FOUND"
+        message:
+          type: string
+          example: "Product not found"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-01-12T10:30:00Z"
