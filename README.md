@@ -768,83 +768,360 @@ curl -X POST http://localhost:8081/api/v1/orders \
 
 ---
 
-## BDD Gherkin 規格
+## BDD 行為驅動開發
 
-### Feature: 建立訂單
+### 什麼是 BDD？
 
-```gherkin
-Feature: 建立訂單
-  作為一個購買者
-  我想要建立訂單購買商品
-  以便完成購物流程
+**行為驅動開發（Behavior-Driven Development, BDD）** 是一種敏捷軟體開發方法論，強調開發人員、QA 和非技術人員之間的協作溝通。
 
-  Background:
-    Given 庫存中有商品 "IPHONE-17-PRO-MAX" 數量為 10
+```mermaid
+flowchart LR
+    subgraph Discovery["探索階段"]
+        A[業務需求] --> B[使用者故事]
+    end
 
-  Scenario: 成功建立訂單
-    Given 我是一個有效的購買者 "王小明" 電子郵件 "ming@example.com"
-    And 我選擇了商品 "IPHONE-17-PRO-MAX" 數量 1
-    And 我使用信用卡 "4111111111111111" 支付 35900 TWD
-    When 我提交訂單
-    Then 訂單狀態應為 "COMPLETED"
-    And 我應收到訊息 "訂購成功"
-    And 庫存應減少 1
+    subgraph Formulation["規格階段"]
+        B --> C[Gherkin 規格]
+        C --> D[Feature 檔案]
+    end
 
-  Scenario: 支付授權失敗
-    Given 我是一個有效的購買者 "李小華" 電子郵件 "hua@example.com"
-    And 我選擇了商品 "IPHONE-17-PRO-MAX" 數量 1
-    And 我使用被拒絕的信用卡 "4000111122223333" 支付 35900 TWD
-    When 我提交訂單
-    Then 訂單狀態應為 "FAILED"
-    And 我應收到訊息 "支付失敗"
-    And 庫存應保持不變
+    subgraph Automation["自動化階段"]
+        D --> E[Step Definitions]
+        E --> F[自動化測試]
+    end
 
-  Scenario: 庫存不足觸發補償
-    Given 我是一個有效的購買者 "張大明" 電子郵件 "ming@example.com"
-    And 我選擇了商品 "IPHONE-17-PRO-MAX" 數量 100
-    And 我使用信用卡 "4111111111111111" 支付 3590000 TWD
-    When 我提交訂單
-    Then 訂單狀態應為 "ROLLBACK_COMPLETED"
-    And 我應收到訊息 "庫存扣減失敗"
-    And 支付授權應被取消
+    subgraph Validation["驗證階段"]
+        F --> G{測試通過?}
+        G -->|是| H[功能完成]
+        G -->|否| I[修正程式碼]
+        I --> F
+    end
 ```
 
-### Feature: 查詢訂單
+### BDD 核心原則
+
+| 原則 | 說明 |
+|------|------|
+| **共同語言** | 使用 Gherkin 語法讓所有人都能理解需求 |
+| **由外而內** | 從使用者行為出發，而非技術實作 |
+| **活文件** | 測試即文件，規格永遠與程式碼同步 |
+| **三方協作** | 業務、開發、QA 共同定義驗收標準 |
+
+### Gherkin 語法說明
+
+Gherkin 是一種領域特定語言（DSL），用於描述軟體行為：
 
 ```gherkin
-Feature: 查詢訂單
-  作為一個購買者
-  我想要查詢我的訂單狀態
-  以便追蹤訂單進度
+# language: zh-TW
+功能: 功能名稱
+  作為 [角色]
+  我希望 [目標]
+  以便 [獲得的價值]
 
-  Scenario: 成功查詢訂單
-    Given 存在一筆訂單 "ORD-12345678" 狀態為 "COMPLETED"
-    When 我查詢訂單 "ORD-12345678"
-    Then 我應看到訂單詳細資訊
-    And 訂單狀態應為 "COMPLETED"
+  背景:
+    假設 [前置條件]
 
-  Scenario: 查詢不存在的訂單
-    When 我查詢訂單 "ORD-NOTEXIST"
-    Then 我應收到 404 錯誤
-    And 錯誤訊息應為 "Order not found: ORD-NOTEXIST"
+  場景: 場景名稱
+    假設 [給定的前置條件]
+    當 [執行的動作]
+    那麼 [預期的結果]
 ```
 
-### Feature: 冪等性處理
+| 關鍵字 | 英文 | 用途 |
+|--------|------|------|
+| 功能 | Feature | 描述測試的功能模組 |
+| 背景 | Background | 所有場景共用的前置條件 |
+| 場景 | Scenario | 一個具體的測試案例 |
+| 假設 | Given | 設定前置條件 |
+| 當 | When | 執行動作 |
+| 那麼 | Then | 驗證結果 |
+| 並且 | And | 連接多個步驟 |
+
+### BDD 工作流程
+
+```mermaid
+sequenceDiagram
+    participant PO as 產品負責人
+    participant Dev as 開發人員
+    participant QA as 測試人員
+
+    PO->>Dev: 1. 提出使用者故事
+    Dev->>QA: 2. 三方會議討論
+    QA->>QA: 3. 撰寫 Gherkin 規格
+    QA->>Dev: 4. 審核規格
+    Dev->>Dev: 5. 實作 Step Definitions
+    Dev->>Dev: 6. 開發功能程式碼
+    Dev->>QA: 7. 執行 BDD 測試
+    QA->>PO: 8. 測試報告
+```
+
+---
+
+## 本專案 BDD 測試案例
+
+本專案使用 **Cucumber** 框架實作 BDD 測試，測試檔案位於：
+```
+order-system/e2e-tests/src/test/resources/features/
+```
+
+### 測試案例總覽
+
+| Feature 檔案 | 功能 | 場景數 | 正向 | 反向 |
+|--------------|------|--------|------|------|
+| `order_creation.feature` | 訂單建立流程 | 7 | 2 | 5 |
+| `inventory_management.feature` | 庫存管理流程 | 6 | 4 | 2 |
+| `payment_processing.feature` | 支付處理流程 | 6 | 2 | 4 |
+| **總計** | | **19** | **8** | **11** |
+
+---
+
+### Feature 1: 訂單建立流程
 
 ```gherkin
-Feature: 冪等性處理
-  作為系統
-  我需要確保重複請求不會建立多筆訂單
-  以便保持資料一致性
+# language: zh-TW
+@order
+功能: 訂單建立流程
+  作為一個電商平台
+  我希望能處理客戶的訂單
+  以便完成商品銷售
 
-  Scenario: 重複請求返回相同結果
-    Given 我使用冪等性金鑰 "unique-key-001"
-    And 我第一次提交訂單
-    And 訂單成功建立為 "ORD-XXXXXXXX"
-    When 我使用相同冪等性金鑰再次提交訂單
-    Then 我應收到相同的訂單編號 "ORD-XXXXXXXX"
-    And 不應建立新訂單
+  背景:
+    假設 系統中有商品 "IPHONE-17" 庫存為 10 件
+    並且 支付服務正常運作
+
+  @positive @happy-path
+  場景: 成功建立訂單
+    假設 買家 "王小明" 的電子郵件為 "ming@example.com"
+    並且 購買商品 "IPHONE-17" 數量為 1 件
+    並且 使用信用卡 "4111111111111111" 有效期 "12/26" CVV "123" 支付 35900 元
+    當 買家提交訂單
+    那麼 訂單應建立成功
+    並且 訂單狀態應為 "COMPLETED"
+    並且 支付狀態應為 "CAPTURED"
+    並且 庫存應扣減至 9 件
+
+  @positive
+  場景: 多件商品訂單成功建立
+    假設 買家 "李四" 的電子郵件為 "li@example.com"
+    並且 購買商品 "IPHONE-17" 數量為 3 件
+    並且 使用信用卡 "4111111111111111" 有效期 "12/26" CVV "123" 支付 107700 元
+    當 買家提交訂單
+    那麼 訂單應建立成功
+    並且 訂單狀態應為 "COMPLETED"
+    並且 庫存應扣減至 7 件
+
+  @negative @payment-failure
+  場景: 支付授權失敗時訂單應標記為失敗
+    假設 買家 "張三" 的電子郵件為 "zhang@example.com"
+    並且 購買商品 "IPHONE-17" 數量為 1 件
+    並且 使用信用卡 "4000000000000002" 有效期 "12/26" CVV "123" 支付 35900 元
+    並且 支付授權將會失敗並返回 "Card declined"
+    當 買家提交訂單
+    那麼 訂單應建立失敗
+    並且 訂單狀態應為 "FAILED"
+    並且 失敗原因應包含 "Card declined"
+    並且 庫存應維持為 10 件
+
+  @negative @insufficient-stock
+  場景: 庫存不足時訂單應失敗並取消支付
+    假設 買家 "王小明" 的電子郵件為 "ming@example.com"
+    並且 購買商品 "IPHONE-17" 數量為 15 件
+    並且 使用信用卡 "4111111111111111" 有效期 "12/26" CVV "123" 支付 538500 元
+    當 買家提交訂單
+    那麼 訂單應建立失敗
+    並且 訂單狀態應為 "ROLLED_BACK"
+    並且 失敗原因應包含 "Insufficient stock"
+    並且 支付授權應已取消
+    並且 庫存應維持為 10 件
+
+  @negative @capture-failure
+  場景: 請款失敗時應執行補償交易
+    假設 買家 "陳大文" 的電子郵件為 "chen@example.com"
+    並且 購買商品 "IPHONE-17" 數量為 1 件
+    並且 使用信用卡 "4111111111111111" 有效期 "12/26" CVV "123" 支付 35900 元
+    並且 請款將會失敗並返回 "Capture timeout"
+    當 買家提交訂單
+    那麼 訂單應建立失敗
+    並且 訂單狀態應為 "ROLLED_BACK"
+    並且 失敗原因應包含 "Capture timeout"
+    並且 庫存應已回滾至 10 件
+    並且 支付授權應已取消
+
+  @negative @invalid-card
+  場景: 無效信用卡格式應返回驗證錯誤
+    假設 買家 "測試用戶" 的電子郵件為 "test@example.com"
+    並且 購買商品 "IPHONE-17" 數量為 1 件
+    並且 使用信用卡 "1234" 有效期 "12/26" CVV "123" 支付 35900 元
+    當 買家提交訂單
+    那麼 應返回驗證錯誤
+    並且 錯誤訊息應包含 "Invalid card number"
+
+  @negative @product-not-found
+  場景: 商品不存在時應返回錯誤
+    假設 買家 "王小明" 的電子郵件為 "ming@example.com"
+    並且 購買商品 "NON-EXISTENT" 數量為 1 件
+    並且 使用信用卡 "4111111111111111" 有效期 "12/26" CVV "123" 支付 35900 元
+    當 買家提交訂單
+    那麼 訂單應建立失敗
+    並且 失敗原因應包含 "Product not found"
 ```
+
+---
+
+### Feature 2: 庫存管理流程
+
+```gherkin
+# language: zh-TW
+@inventory
+功能: 庫存管理流程
+  作為一個庫存系統
+  我希望能正確管理商品庫存
+  以便確保訂單履行的準確性
+
+  背景:
+    假設 商品 "IPHONE-17" 名稱為 "iPhone 17 Pro Max" 初始庫存為 100 件
+
+  @positive
+  場景: 成功扣減庫存
+    當 為訂單 "ORD-12345678" 扣減商品 "IPHONE-17" 數量 5 件
+    那麼 扣減應成功
+    並且 商品 "IPHONE-17" 庫存應為 95 件
+
+  @positive
+  場景: 成功回滾庫存
+    假設 已為訂單 "ORD-12345678" 扣減商品 "IPHONE-17" 數量 5 件
+    當 為訂單 "ORD-12345678" 回滾商品 "IPHONE-17" 數量 5 件
+    那麼 回滾應成功
+    並且 商品 "IPHONE-17" 庫存應為 100 件
+
+  @negative
+  場景: 庫存不足時扣減失敗
+    當 為訂單 "ORD-99999999" 扣減商品 "IPHONE-17" 數量 150 件
+    那麼 扣減應失敗
+    並且 失敗原因應包含 "Insufficient stock"
+    並且 商品 "IPHONE-17" 庫存應維持 100 件
+
+  @negative
+  場景: 商品不存在時扣減失敗
+    當 為訂單 "ORD-12345678" 扣減商品 "NON-EXISTENT" 數量 1 件
+    那麼 扣減應失敗
+    並且 失敗原因應包含 "Product not found"
+
+  @positive @idempotent
+  場景: 重複扣減請求應具備冪等性
+    當 為訂單 "ORD-IDEM0001" 扣減商品 "IPHONE-17" 數量 2 件
+    並且 再次為訂單 "ORD-IDEM0001" 扣減商品 "IPHONE-17" 數量 2 件
+    那麼 兩次扣減都應成功
+    並且 商品 "IPHONE-17" 庫存應為 98 件
+    並且 只應有一筆扣減記錄
+
+  @positive @concurrent
+  場景: 並發扣減應正確處理
+    當 同時有 3 個訂單各扣減商品 "IPHONE-17" 數量 10 件
+    那麼 所有扣減都應成功
+    並且 商品 "IPHONE-17" 庫存應為 70 件
+```
+
+---
+
+### Feature 3: 支付處理流程
+
+```gherkin
+# language: zh-TW
+@payment
+功能: 支付處理流程
+  作為一個支付系統
+  我希望能安全地處理各種支付情境
+  以便確保交易的完整性
+
+  @positive
+  場景: 成功授權並請款
+    假設 有效的支付請求金額為 35900 元幣別為 "TWD"
+    並且 信用卡號為 "4111111111111111" 有效期為 "12/26" CVV 為 "123"
+    當 執行支付授權
+    那麼 授權應成功
+    並且 應返回支付編號
+    當 執行請款
+    那麼 請款應成功
+    並且 支付狀態應為 "CAPTURED"
+
+  @positive
+  場景: 成功取消授權
+    假設 有效的支付請求金額為 50000 元幣別為 "TWD"
+    並且 信用卡號為 "4111111111111111" 有效期為 "12/26" CVV 為 "123"
+    當 執行支付授權
+    那麼 授權應成功
+    當 取消支付授權
+    那麼 取消應成功
+    並且 支付狀態應為 "VOIDED"
+
+  @negative
+  場景: 餘額不足時授權失敗
+    假設 有效的支付請求金額為 1000000 元幣別為 "TWD"
+    並且 信用卡號為 "4000000000000002" 有效期為 "12/26" CVV 為 "123"
+    當 執行支付授權
+    那麼 授權應失敗
+    並且 失敗原因應為 "Insufficient funds"
+
+  @negative
+  場景: 卡片過期時授權失敗
+    假設 有效的支付請求金額為 35900 元幣別為 "TWD"
+    並且 信用卡號為 "4111111111111111" 有效期為 "01/20" CVV 為 "123"
+    當 執行支付授權
+    那麼 授權應失敗
+    並且 失敗原因應為 "Card expired"
+
+  @negative
+  場景: CVV 錯誤時授權失敗
+    假設 有效的支付請求金額為 35900 元幣別為 "TWD"
+    並且 信用卡號為 "4111111111111111" 有效期為 "12/26" CVV 為 "999"
+    當 執行支付授權
+    那麼 授權應失敗
+    並且 失敗原因應為 "Invalid CVV"
+
+  @negative
+  場景: 重複請款應失敗
+    假設 有效的支付請求金額為 35900 元幣別為 "TWD"
+    並且 信用卡號為 "4111111111111111" 有效期為 "12/26" CVV 為 "123"
+    當 執行支付授權
+    並且 執行請款
+    當 再次執行請款
+    那麼 請款應失敗
+    並且 失敗原因應為 "Payment already captured"
+```
+
+---
+
+### 執行 BDD 測試
+
+```bash
+# 進入專案目錄
+cd order-system
+
+# 執行所有 BDD 測試
+./gradlew :e2e-tests:test
+
+# 執行特定標籤的測試
+./gradlew :e2e-tests:test -Dcucumber.filter.tags="@positive"
+./gradlew :e2e-tests:test -Dcucumber.filter.tags="@negative"
+./gradlew :e2e-tests:test -Dcucumber.filter.tags="@order"
+
+# 產生測試報告
+./gradlew :e2e-tests:test --info
+```
+
+### 測試標籤說明
+
+| 標籤 | 說明 |
+|------|------|
+| `@positive` | 正向測試（預期成功的場景） |
+| `@negative` | 反向測試（預期失敗的場景） |
+| `@happy-path` | 主要成功路徑 |
+| `@order` | 訂單相關測試 |
+| `@inventory` | 庫存相關測試 |
+| `@payment` | 支付相關測試 |
+| `@idempotent` | 冪等性測試 |
+| `@concurrent` | 並發測試 |
 
 ---
 
