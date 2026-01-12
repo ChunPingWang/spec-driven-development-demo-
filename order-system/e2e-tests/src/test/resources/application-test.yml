@@ -1,0 +1,17 @@
+# E2E Test Configuration
+order:
+  service:
+    url: ${ORDER_SERVICE_URL:http://localhost:8081}
+
+inventory:
+  service:
+    url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+
+payment:
+  service:
+    url: ${PAYMENT_SERVICE_URL:http://localhost:8083}
+
+# Cucumber configuration
+cucumber:
+  publish:
+    enabled: false
