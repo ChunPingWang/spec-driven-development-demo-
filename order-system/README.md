@@ -21,33 +21,121 @@
 
 ## 系統架構
 
+### 整體架構
+
+```mermaid
+flowchart TB
+    subgraph Client
+        C[Client Application]
+    end
+
+    subgraph OrderService["Order Service :8081"]
+        OC[REST Controller]
+        SAGA[SAGA Orchestrator]
+        OD[Order Domain]
+        OR[(H2 Database)]
+
+        OC --> SAGA
+        SAGA --> OD
+        OD --> OR
+    end
+
+    subgraph PaymentService["Payment Service :8082"]
+        PC[REST Controller]
+        PD[Payment Domain]
+        PR[(H2 Database)]
+        ACQ[Mock Acquirer]
+
+        PC --> PD
+        PD --> PR
+        PD --> ACQ
+    end
+
+    subgraph InventoryService["Inventory Service :8083"]
+        IC[REST Controller]
+        ID[Product Domain]
+        IR[(H2 Database)]
+
+        IC --> ID
+        ID --> IR
+    end
+
+    C -->|POST /api/v1/orders| OC
+    SAGA -->|1. POST /payments/authorize| PC
+    SAGA -->|2. POST /inventory/deduct| IC
+    SAGA -->|3. POST /payments/capture| PC
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client                                   │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Order Service (8081)                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   REST API  │  │    SAGA     │  │     Domain Layer        │  │
-│  │  Controller │─▶│ Orchestrator│─▶│  (Order Aggregate)      │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-           │                              │
-           ▼                              ▼
-┌──────────────────────┐    ┌──────────────────────┐
-│ Payment Service(8082)│    │Inventory Service(8083)│
-│  ┌────────────────┐  │    │  ┌────────────────┐  │
-│  │ Payment Domain │  │    │  │ Product Domain │  │
-│  │   Aggregate    │  │    │  │   Aggregate    │  │
-│  └────────────────┘  │    │  └────────────────┘  │
-│          │           │    │          │           │
-│          ▼           │    │          ▼           │
-│  ┌────────────────┐  │    │  ┌────────────────┐  │
-│  │ Mock Acquirer  │  │    │  │   H2 Database  │  │
-│  └────────────────┘  │    │  └────────────────┘  │
-└──────────────────────┘    └──────────────────────┘
+
+### 六角形架構（單一服務）
+
+```mermaid
+flowchart LR
+    subgraph Adapters_In["Inbound Adapters"]
+        REST[REST Controller]
+    end
+
+    subgraph Application["Application Layer"]
+        UC[Use Cases]
+        CMD[Command Handlers]
+        QRY[Query Handlers]
+        SAGA_L[SAGA Orchestrator]
+    end
+
+    subgraph Domain["Domain Layer"]
+        AGG[Aggregates]
+        VO[Value Objects]
+        EVT[Domain Events]
+    end
+
+    subgraph Ports["Ports"]
+        IP[Inbound Ports]
+        OP[Outbound Ports]
+    end
+
+    subgraph Adapters_Out["Outbound Adapters"]
+        REPO[JPA Repository]
+        HTTP[HTTP Client]
+    end
+
+    subgraph Infra["Infrastructure"]
+        DB[(Database)]
+        EXT[External Services]
+    end
+
+    REST --> IP
+    IP --> UC
+    UC --> CMD
+    UC --> QRY
+    CMD --> SAGA_L
+    CMD --> AGG
+    QRY --> AGG
+    AGG --> VO
+    AGG --> EVT
+    AGG --> OP
+    OP --> REPO
+    OP --> HTTP
+    REPO --> DB
+    HTTP --> EXT
+```
+
+### SAGA 流程狀態機
+
+```mermaid
+stateDiagram-v2
+    [*] --> CREATED: 建立訂單
+
+    CREATED --> PAYMENT_AUTHORIZED: 支付授權成功
+    CREATED --> FAILED: 支付授權失敗
+
+    PAYMENT_AUTHORIZED --> INVENTORY_DEDUCTED: 庫存扣減成功
+    PAYMENT_AUTHORIZED --> ROLLBACK_COMPLETED: 庫存扣減失敗<br/>→ 取消支付授權
+
+    INVENTORY_DEDUCTED --> COMPLETED: 支付請款成功
+    INVENTORY_DEDUCTED --> ROLLBACK_COMPLETED: 支付請款失敗<br/>→ 回滾庫存 + 取消支付
+
+    COMPLETED --> [*]
+    FAILED --> [*]
+    ROLLBACK_COMPLETED --> [*]
 ```
 
 ### 架構特點
